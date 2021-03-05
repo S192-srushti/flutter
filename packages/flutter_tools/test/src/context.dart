@@ -17,8 +17,8 @@ import 'package:flutter_tools/src/base/signals.dart';
 import 'package:flutter_tools/src/base/template.dart';
 import 'package:flutter_tools/src/base/terminal.dart';
 import 'package:flutter_tools/src/base/time.dart';
-import 'package:flutter_tools/src/build_runner/mustache_template.dart';
 import 'package:flutter_tools/src/build_info.dart';
+import 'package:flutter_tools/src/isolated/mustache_template.dart';
 import 'package:flutter_tools/src/cache.dart';
 import 'package:flutter_tools/src/context_runner.dart';
 import 'package:flutter_tools/src/dart/pub.dart';
@@ -58,6 +58,7 @@ void testUsingContext(
   Map<Type, Generator> overrides = const <Type, Generator>{},
   bool initializeFlutterRoot = true,
   String testOn,
+  Timeout timeout,
   bool skip, // should default to `false`, but https://github.com/dart-lang/test/issues/545 doesn't allow this
 }) {
   if (overrides[FileSystem] != null && overrides[ProcessManager] == null) {
@@ -127,7 +128,6 @@ void testUsingContext(
           Usage: () => FakeUsage(),
           XcodeProjectInterpreter: () => FakeXcodeProjectInterpreter(),
           FileSystem: () => LocalFileSystemBlockingSetCurrentDirectory(),
-          TimeoutConfiguration: () => const TimeoutConfiguration(),
           PlistParser: () => FakePlistParser(),
           Signals: () => FakeSignals(),
           Pub: () => ThrowingPub(), // prevent accidentally using pub.
@@ -175,7 +175,7 @@ void testUsingContext(
       // BotDetector implementation in the overrides.
       BotDetector: overrides[BotDetector] ?? () => const AlwaysTrueBotDetector(),
     });
-  }, testOn: testOn, skip: skip);
+  }, testOn: testOn, skip: skip, timeout: timeout);
 }
 
 void _printBufferedErrors(AppContext testContext) {
@@ -311,9 +311,6 @@ class FakeOperatingSystemUtils implements OperatingSystemUtils {
   File makePipe(String path) => null;
 
   @override
-  void zip(Directory data, File zipFile) { }
-
-  @override
   void unzip(File file, Directory targetDirectory) { }
 
   @override
@@ -335,9 +332,6 @@ class FakeOperatingSystemUtils implements OperatingSystemUtils {
 class MockIOSSimulatorUtils extends Mock implements IOSSimulatorUtils {}
 
 class FakeUsage implements Usage {
-  @override
-  bool get isFirstRun => false;
-
   @override
   bool get suppressAnalytics => false;
 
@@ -418,16 +412,12 @@ class FakeXcodeProjectInterpreter implements XcodeProjectInterpreter {
       BufferLogger.test(),
     );
   }
-}
-
-class MockFlutterVersion extends Mock implements FlutterVersion {
-  MockFlutterVersion({bool isStable = false}) : _isStable = isStable;
-
-  final bool _isStable;
 
   @override
-  bool get isMaster => !_isStable;
+  List<String> xcrunCommand() => <String>['xcrun'];
 }
+
+class MockFlutterVersion extends Mock implements FlutterVersion {}
 
 class MockClock extends Mock implements SystemClock {}
 

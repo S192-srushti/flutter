@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'dart:async';
 import 'dart:io' show ProcessResult, Process;
 
 import 'package:file/file.dart';
@@ -14,6 +13,7 @@ import 'package:flutter_tools/src/base/logger.dart';
 import 'package:flutter_tools/src/base/platform.dart';
 import 'package:flutter_tools/src/build_info.dart';
 import 'package:flutter_tools/src/build_system/build_system.dart';
+import 'package:flutter_tools/src/devfs.dart';
 import 'package:flutter_tools/src/device.dart';
 import 'package:flutter_tools/src/globals.dart' as globals;
 import 'package:flutter_tools/src/ios/mac.dart';
@@ -21,7 +21,6 @@ import 'package:flutter_tools/src/ios/plist_parser.dart';
 import 'package:flutter_tools/src/ios/simulators.dart';
 import 'package:flutter_tools/src/macos/xcode.dart';
 import 'package:flutter_tools/src/project.dart';
-import 'package:flutter_tools/src/protocol_discovery.dart';
 import 'package:mockito/mockito.dart';
 import 'package:process/process.dart';
 
@@ -29,7 +28,6 @@ import '../../src/common.dart';
 import '../../src/context.dart';
 import '../../src/mocks.dart';
 
-class MockFile extends Mock implements File {}
 class MockIMobileDevice extends Mock implements IMobileDevice {}
 class MockLogger extends Mock implements Logger {}
 class MockProcess extends Mock implements Process {}
@@ -72,7 +70,6 @@ void main() {
       final IOSSimulator simulator = IOSSimulator(
         '123',
         simControl: mockSimControl,
-        xcode: mockXcode,
       );
       final DevicePortForwarder portForwarder = simulator.portForwarder;
       await portForwarder.forward(123);
@@ -96,7 +93,6 @@ void main() {
     final IOSSimulator simulator = IOSSimulator(
       '123',
       simControl: MockSimControl(),
-      xcode: MockXcode(),
     );
 
     expect(simulator.supportsRuntimeMode(BuildMode.debug), true);
@@ -111,11 +107,9 @@ void main() {
 
   group('logFilePath', () {
     MockSimControl mockSimControl;
-    MockXcode mockXcode;
 
     setUp(() {
       mockSimControl = MockSimControl();
-      mockXcode = MockXcode();
     });
 
     testUsingContext('defaults to rooted from HOME', () {
@@ -123,7 +117,6 @@ void main() {
       final IOSSimulator simulator = IOSSimulator(
         '123',
         simControl: mockSimControl,
-        xcode: mockXcode,
       );
       expect(simulator.logFilePath, '/foo/bar/Library/Logs/CoreSimulator/123/system.log');
     }, overrides: <Type, Generator>{
@@ -131,7 +124,6 @@ void main() {
       FileSystemUtils: () => fsUtils,
       FileSystem: () => fileSystem,
       ProcessManager: () => FakeProcessManager.any(),
-      Xcode: () => mockXcode,
     }, testOn: 'posix');
 
     testUsingContext('respects IOS_SIMULATOR_LOG_FILE_PATH', () {
@@ -140,7 +132,6 @@ void main() {
       final IOSSimulator simulator = IOSSimulator(
         '456',
         simControl: mockSimControl,
-        xcode: mockXcode,
       );
       expect(simulator.logFilePath, '/baz/qux/456/system.log');
     }, overrides: <Type, Generator>{
@@ -148,7 +139,6 @@ void main() {
       FileSystemUtils: () => fsUtils,
       FileSystem: () => fileSystem,
       ProcessManager: () => FakeProcessManager.any(),
-      Xcode: () => mockXcode,
     });
   });
 
@@ -203,11 +193,9 @@ void main() {
 
   group('sdkMajorVersion', () {
     MockSimControl mockSimControl;
-    MockXcode mockXcode;
 
     setUp(() {
       mockSimControl = MockSimControl();
-      mockXcode = MockXcode();
     });
 
     // This new version string appears in SimulatorApp-850 CoreSimulator-518.16 beta.
@@ -217,7 +205,6 @@ void main() {
         name: 'iPhone SE',
         simulatorCategory: 'com.apple.CoreSimulator.SimRuntime.iOS-11-3',
         simControl: mockSimControl,
-        xcode: mockXcode,
       );
 
       expect(await device.sdkMajorVersion, 11);
@@ -229,7 +216,6 @@ void main() {
         name: 'iPhone SE',
         simulatorCategory: 'iOS 11.2',
         simControl: mockSimControl,
-        xcode: mockXcode,
       );
 
       expect(await device.sdkMajorVersion, 11);
@@ -241,7 +227,6 @@ void main() {
         name: 'iPhone SE',
         simulatorCategory: 'iOS 11.2',
         simControl: mockSimControl,
-        xcode: mockXcode,
       );
 
       expect(device.category, Category.mobile);
@@ -250,11 +235,9 @@ void main() {
 
   group('IOSSimulator.isSupported', () {
     MockSimControl mockSimControl;
-    MockXcode mockXcode;
 
     setUp(() {
       mockSimControl = MockSimControl();
-      mockXcode = MockXcode();
     });
 
     testUsingContext('Apple TV is unsupported', () {
@@ -262,14 +245,12 @@ void main() {
         'x',
         name: 'Apple TV',
         simControl: mockSimControl,
-        xcode: mockXcode,
       );
       expect(simulator.isSupported(), false);
     }, overrides: <Type, Generator>{
       Platform: () => osx,
       FileSystem: () => fileSystem,
       ProcessManager: () => FakeProcessManager.any(),
-      Xcode: () => mockXcode,
     });
 
     testUsingContext('Apple Watch is unsupported', () {
@@ -277,13 +258,11 @@ void main() {
         'x',
         name: 'Apple Watch',
         simControl: mockSimControl,
-        xcode: mockXcode,
       ).isSupported(), false);
     }, overrides: <Type, Generator>{
       Platform: () => osx,
       FileSystem: () => fileSystem,
       ProcessManager: () => FakeProcessManager.any(),
-      Xcode: () => mockXcode,
     });
 
     testUsingContext('iPad 2 is supported', () {
@@ -291,13 +270,11 @@ void main() {
         'x',
         name: 'iPad 2',
         simControl: mockSimControl,
-        xcode: mockXcode,
       ).isSupported(), true);
     }, overrides: <Type, Generator>{
       Platform: () => osx,
       FileSystem: () => fileSystem,
       ProcessManager: () => FakeProcessManager.any(),
-      Xcode: () => mockXcode,
     });
 
     testUsingContext('iPad Retina is supported', () {
@@ -305,13 +282,11 @@ void main() {
         'x',
         name: 'iPad Retina',
         simControl: mockSimControl,
-        xcode: mockXcode,
       ).isSupported(), true);
     }, overrides: <Type, Generator>{
       Platform: () => osx,
       FileSystem: () => fileSystem,
       ProcessManager: () => FakeProcessManager.any(),
-      Xcode: () => mockXcode,
     });
 
     testUsingContext('iPhone 5 is supported', () {
@@ -319,13 +294,11 @@ void main() {
         'x',
         name: 'iPhone 5',
         simControl: mockSimControl,
-        xcode: mockXcode,
       ).isSupported(), true);
     }, overrides: <Type, Generator>{
       Platform: () => osx,
       FileSystem: () => fileSystem,
       ProcessManager: () => FakeProcessManager.any(),
-      Xcode: () => mockXcode,
     });
 
     testUsingContext('iPhone 5s is supported', () {
@@ -333,13 +306,11 @@ void main() {
         'x',
         name: 'iPhone 5s',
         simControl: mockSimControl,
-        xcode: mockXcode,
       ).isSupported(), true);
     }, overrides: <Type, Generator>{
       Platform: () => osx,
       FileSystem: () => fileSystem,
       ProcessManager: () => FakeProcessManager.any(),
-      Xcode: () => mockXcode,
     });
 
     testUsingContext('iPhone SE is supported', () {
@@ -347,13 +318,11 @@ void main() {
         'x',
         name: 'iPhone SE',
         simControl: mockSimControl,
-        xcode: mockXcode,
       ).isSupported(), true);
     }, overrides: <Type, Generator>{
       Platform: () => osx,
       FileSystem: () => fileSystem,
       ProcessManager: () => FakeProcessManager.any(),
-      Xcode: () => mockXcode,
     });
 
     testUsingContext('iPhone 7 Plus is supported', () {
@@ -361,13 +330,11 @@ void main() {
         'x',
         name: 'iPhone 7 Plus',
         simControl: mockSimControl,
-        xcode: mockXcode,
       ).isSupported(), true);
     }, overrides: <Type, Generator>{
       Platform: () => osx,
       FileSystem: () => fileSystem,
       ProcessManager: () => FakeProcessManager.any(),
-      Xcode: () => mockXcode,
     });
 
     testUsingContext('iPhone X is supported', () {
@@ -375,13 +342,11 @@ void main() {
         'x',
         name: 'iPhone X',
         simControl: mockSimControl,
-        xcode: mockXcode,
       ).isSupported(), true);
     }, overrides: <Type, Generator>{
       Platform: () => osx,
       FileSystem: () => fileSystem,
       ProcessManager: () => FakeProcessManager.any(),
-      Xcode: () => mockXcode,
     });
   });
 
@@ -390,8 +355,6 @@ void main() {
     MockLogger mockLogger;
     MockProcessManager mockProcessManager;
     IOSSimulator deviceUnderTest;
-    // only used for fs.path.join()
-    final FileSystem fs = globals.fs;
 
     setUp(() {
       mockXcode = MockXcode();
@@ -414,29 +377,16 @@ void main() {
         'x',
         name: 'iPhone SE',
         simControl: simControl,
-        xcode: mockXcode,
       );
       when(mockXcode.xcrunCommand()).thenReturn(<String>['xcrun']);
     });
 
-    testWithoutContext(
-      "old Xcode doesn't support screenshot",
-      () {
-        when(mockXcode.majorVersion).thenReturn(7);
-        when(mockXcode.minorVersion).thenReturn(1);
-        expect(deviceUnderTest.supportsScreenshot, false);
-      },
-    );
 
     testWithoutContext(
-      'Xcode 8.2+ supports screenshots',
+      'supports screenshots',
       () async {
-        when(mockXcode.majorVersion).thenReturn(8);
-        when(mockXcode.minorVersion).thenReturn(2);
-        expect(deviceUnderTest.supportsScreenshot, true);
-        final MockFile mockFile = MockFile();
-        when(mockFile.path).thenReturn(fs.path.join('some', 'path', 'to', 'screenshot.png'));
-        await deviceUnderTest.takeScreenshot(mockFile);
+        final File screenshot = MemoryFileSystem.test().file('screenshot.png');
+        await deviceUnderTest.takeScreenshot(screenshot);
         verify(mockProcessManager.run(
           <String>[
             'xcrun',
@@ -444,7 +394,7 @@ void main() {
             'io',
             'x',
             'screenshot',
-            fs.path.join('some', 'path', 'to', 'screenshot.png'),
+            'screenshot.png',
           ],
           environment: null,
           workingDirectory: null,
@@ -473,7 +423,6 @@ void main() {
         name: 'iPhone SE',
         simulatorCategory: 'iOS 9.3',
         simControl: mockSimControl,
-        xcode: mockXcode,
       );
       await launchDeviceSystemLogTool(device);
       expect(
@@ -489,7 +438,6 @@ void main() {
         fileSystem: fileSystem,
         platform: macosPlatform,
       ),
-      Xcode: () => mockXcode,
     });
 
     testUsingContext('unified logging with app name', () async {
@@ -498,7 +446,6 @@ void main() {
         name: 'iPhone SE',
         simulatorCategory: 'iOS 11.0',
         simControl: mockSimControl,
-        xcode: mockXcode,
       );
       await launchDeviceUnifiedLogging(device, 'My Super Awesome App');
 
@@ -535,7 +482,6 @@ void main() {
         name: 'iPhone SE',
         simulatorCategory: 'iOS 11.0',
         simControl: mockSimControl,
-        xcode: mockXcode,
       );
       await launchDeviceUnifiedLogging(device, null);
 
@@ -562,7 +508,6 @@ void main() {
       overrides: <Type, Generator>{
         ProcessManager: () => mockProcessManager,
         FileSystem: () => fileSystem,
-        Xcode: () => mockXcode,
       });
   });
 
@@ -602,7 +547,6 @@ Dec 20 17:04:32 md32-11-vm1 Another App[88374]: Ignore this text'''
           '123456',
           simulatorCategory: 'iOS 10.0',
           simControl: mockSimControl,
-          xcode: mockXcode,
         );
         final DeviceLogReader logReader = device.getLogReader(
           app: await BuildableIOSApp.fromProject(mockIosProject, null),
@@ -637,7 +581,6 @@ Dec 20 17:04:32 md32-11-vm1 Another App[88374]: Ignore this text'''
           '123456',
           simulatorCategory: 'iOS 10.3',
           simControl: mockSimControl,
-          xcode: mockXcode,
         );
         final DeviceLogReader logReader = device.getLogReader(
           app: await BuildableIOSApp.fromProject(mockIosProject, null),
@@ -685,7 +628,6 @@ Dec 20 17:04:32 md32-11-vm1 Another App[88374]: Ignore this text'''
           '123456',
           simulatorCategory: 'iOS 10.3',
           simControl: mockSimControl,
-          xcode: mockXcode,
         );
         final DeviceLogReader logReader = device.getLogReader(
           app: await BuildableIOSApp.fromProject(mockIosProject, null),
@@ -731,14 +673,14 @@ Dec 20 17:04:32 md32-11-vm1 Another App[88374]: Ignore this text'''
               '--predicate',
               logPredicate,
             ],
-            stdout: '''
+            stdout: r'''
 },{
   "traceID" : 37579774151491588,
   "eventMessage" : "Single line message",
   "eventType" : "logEvent"
 },{
   "traceID" : 37579774151491588,
-  "eventMessage" : "Multi line message\\n  continues...\\n  continues..."
+  "eventMessage" : "Multi line message\n  continues...\n  continues..."
 },{
   "traceID" : 37579774151491588,
   "eventMessage" : "Single line message, not the part of the above",
@@ -751,7 +693,6 @@ Dec 20 17:04:32 md32-11-vm1 Another App[88374]: Ignore this text'''
           '123456',
           simulatorCategory: 'iOS 11.0',
           simControl: mockSimControl,
-          xcode: mockXcode,
         );
         final DeviceLogReader logReader = device.getLogReader(
           app: await BuildableIOSApp.fromProject(mockIosProject, null),
@@ -766,7 +707,6 @@ Dec 20 17:04:32 md32-11-vm1 Another App[88374]: Ignore this text'''
       }, overrides: <Type, Generator>{
         ProcessManager: () => fakeProcessManager,
         FileSystem: () => fileSystem,
-        Xcode: () => mockXcode,
       });
     });
   });
@@ -869,7 +809,6 @@ Dec 20 17:04:32 md32-11-vm1 Another App[88374]: Ignore this text'''
         name: 'Testo',
         simulatorCategory: 'NaN',
         simControl: simControl,
-        xcode: mockXcode,
       );
 
       expect(await iosSimulatorA.sdkMajorVersion, 11);
@@ -915,13 +854,11 @@ Dec 20 17:04:32 md32-11-vm1 Another App[88374]: Ignore this text'''
   group('startApp', () {
     SimControl simControl;
     MockXcode mockXcode;
-    MockPrototcolDiscovery mockPrototcolDiscovery;
 
     setUp(() {
       simControl = MockSimControl();
       mockXcode = MockXcode();
       when(mockXcode.xcrunCommand()).thenReturn(<String>['xcrun']);
-      mockPrototcolDiscovery = MockPrototcolDiscovery();
     });
 
     testUsingContext("startApp uses compiled app's Info.plist to find CFBundleIdentifier", () async {
@@ -930,26 +867,40 @@ Dec 20 17:04:32 md32-11-vm1 Another App[88374]: Ignore this text'''
         name: 'iPhone SE',
         simulatorCategory: 'iOS 11.2',
         simControl: simControl,
-        xcode: mockXcode,
       );
       when(globals.plistParser.getValueFromFile(any, any)).thenReturn('correct');
-      when(mockPrototcolDiscovery.uri)
-          .thenAnswer((_) async => Uri.parse('http://localhost:5678'));
 
       final Directory mockDir = globals.fs.currentDirectory;
       final IOSApp package = PrebuiltIOSApp(projectBundleId: 'incorrect', bundleName: 'name', bundleDir: mockDir);
 
       const BuildInfo mockInfo = BuildInfo(BuildMode.debug, 'flavor', treeShakeIcons: false);
-      final DebuggingOptions mockOptions =
-          DebuggingOptions.enabled(mockInfo, hostVmServicePort: 8888);
+      final DebuggingOptions mockOptions = DebuggingOptions.disabled(mockInfo);
       await device.startApp(package, prebuiltApplication: true, debuggingOptions: mockOptions);
 
-      verify(simControl.launch(any, 'correct', <String>[
-        '--enable-dart-profiling',
-        '--enable-checked-mode',
-        '--verify-entry-points',
-        '--observatory-port=8888',
-      ]));
+      verify(simControl.launch(any, 'correct', any));
+    }, overrides: <Type, Generator>{
+      PlistParser: () => MockPlistUtils(),
+      FileSystem: () => fileSystem,
+      ProcessManager: () => FakeProcessManager.any(),
+      Xcode: () => mockXcode,
+    });
+
+    testUsingContext('startApp respects the enable software rendering flag', () async {
+      final IOSSimulator device = IOSSimulator(
+        'x',
+        name: 'iPhone SE',
+        simulatorCategory: 'iOS 11.2',
+        simControl: simControl,
+      );
+
+      final Directory mockDir = globals.fs.currentDirectory;
+      final IOSApp package = PrebuiltIOSApp(projectBundleId: 'incorrect', bundleName: 'name', bundleDir: mockDir);
+
+      const BuildInfo mockInfo = BuildInfo(BuildMode.debug, 'flavor', treeShakeIcons: false);
+      final DebuggingOptions mockOptions = DebuggingOptions.enabled(mockInfo, enableSoftwareRendering: true);
+      await device.startApp(package, prebuiltApplication: true, debuggingOptions: mockOptions);
+
+      verify(simControl.launch(any, any, captureAny)).captured.contains('--enable-software-rendering');
     }, overrides: <Type, Generator>{
       PlistParser: () => MockPlistUtils(),
       FileSystem: () => fileSystem,
@@ -982,11 +933,10 @@ flutter:
       final IOSSimulator simulator = IOSSimulator(
         'test',
         simControl: mockSimControl,
-        xcode: mockXcode,
       );
       expect(simulator.isSupportedForProject(flutterProject), true);
     }, overrides: <Type, Generator>{
-      FileSystem: () => MemoryFileSystem(),
+      FileSystem: () => MemoryFileSystem.test(),
       ProcessManager: () => FakeProcessManager.any(),
       Xcode: () => mockXcode,
     });
@@ -1001,11 +951,10 @@ flutter:
       final IOSSimulator simulator = IOSSimulator(
         'test',
         simControl: mockSimControl,
-        xcode: mockXcode,
       );
       expect(simulator.isSupportedForProject(flutterProject), true);
     }, overrides: <Type, Generator>{
-      FileSystem: () => MemoryFileSystem(),
+      FileSystem: () => MemoryFileSystem.test(),
       ProcessManager: () => FakeProcessManager.any(),
       Xcode: () => mockXcode,
     });
@@ -1018,16 +967,23 @@ flutter:
       final IOSSimulator simulator = IOSSimulator(
         'test',
         simControl: mockSimControl,
-        xcode: mockXcode,
       );
       expect(simulator.isSupportedForProject(flutterProject), false);
     }, overrides: <Type, Generator>{
-      FileSystem: () => MemoryFileSystem(),
+      FileSystem: () => MemoryFileSystem.test(),
       ProcessManager: () => FakeProcessManager.any(),
       Xcode: () => mockXcode,
+    });
+
+    testUsingContext('createDevFSWriter returns a LocalDevFSWriter', () {
+      final IOSSimulator simulator = IOSSimulator(
+        'test',
+        simControl: mockSimControl,
+      );
+
+      expect(simulator.createDevFSWriter(null, ''), isA<LocalDevFSWriter>());
     });
   });
 }
 
-class MockPrototcolDiscovery extends Mock implements ProtocolDiscovery {}
 class MockBuildSystem extends Mock implements BuildSystem {}
